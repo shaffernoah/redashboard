@@ -391,6 +391,67 @@ def calculate_relative_metrics(metro_data, state_data, national_data):
         st.warning(f"Error calculating relative metrics: {str(e)}")
         return None
 
+def calculate_all_metro_scores():
+    """Calculate investment scores for all metro areas"""
+    try:
+        # Get all metro areas
+        metros = data['home_values']['RegionName'].unique()
+        scores = []
+        
+        for metro in metros:
+            try:
+                # Get state for this metro
+                state = data['home_values'][data['home_values']['RegionName'] == metro]['StateName'].iloc[0]
+                
+                # Get metro data
+                metro_mask = (data['home_values']['RegionName'] == metro)
+                metro_prices = melt_data(data['home_values'][metro_mask])
+                metro_rentals = melt_data(data['rentals'][metro_mask])
+                
+                # Calculate metrics
+                pr_data = calculate_price_rent_ratio(metro_prices, metro_rentals)
+                
+                if pr_data:
+                    # Get coordinates
+                    coords = get_metro_coordinates(metro, state)
+                    if coords:
+                        lat, lon = coords
+                        
+                        scores.append({
+                            'metro': metro,
+                            'state': state,
+                            'lat': lat,
+                            'lon': lon,
+                            'investment_score': pr_data['investment_score'],
+                            'price_trend': pr_data['price_trend'],
+                            'rent_trend': pr_data['rent_trend'],
+                            'pr_ratio': pr_data['current_ratio']
+                        })
+            except Exception as e:
+                st.warning(f"Error processing {metro}: {str(e)}")
+                continue
+        
+        if scores:
+            return pd.DataFrame(scores)
+        return pd.DataFrame()
+        
+    except Exception as e:
+        st.error(f"Error calculating metro scores: {str(e)}")
+        return pd.DataFrame()
+
+@st.cache_data
+def get_metro_coordinates(metro, state):
+    """Get coordinates for a metro area using Nominatim"""
+    try:
+        geolocator = Nominatim(user_agent="zillow_dashboard")
+        location = geolocator.geocode(f"{metro}, {state}, USA")
+        if location:
+            return location.latitude, location.longitude
+        return None
+    except Exception as e:
+        st.warning(f"Error getting coordinates for {metro}, {state}: {str(e)}")
+        return None
+
 def plot_market_pressure_gauge(imbalance_data):
     """Create a gauge chart for market pressure"""
     if not imbalance_data:
