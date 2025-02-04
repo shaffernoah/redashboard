@@ -143,11 +143,9 @@ def get_metro_coordinates(metro, state):
             except Exception:
                 continue
         
-        st.warning(f"Could not find coordinates for {metro_key}, {state}")
         return None
         
-    except Exception as e:
-        st.warning(f"Error getting coordinates for {metro}, {state}: {str(e)}")
+    except Exception:
         return None
 
 def melt_data(df, id_cols=None):
@@ -521,7 +519,6 @@ def calculate_all_metro_scores():
                         })
                         
             except Exception as e:
-                st.warning(f"Error processing {metro}: {str(e)}")
                 continue
                 
             # Update progress
@@ -582,8 +579,7 @@ def generate_metro_scores_csv():
                             'pr_ratio': pr_data['current_ratio']
                         })
                         
-            except Exception as e:
-                st.warning(f"Error processing {metro}: {str(e)}")
+            except Exception:
                 continue
                 
             # Update progress
