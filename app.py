@@ -63,56 +63,94 @@ px.set_mapbox_access_token(st.secrets["mapbox"]["token"])
 
 # Common metro coordinates to avoid API calls
 METRO_COORDINATES = {
-    'New York': (40.7128, -74.0060),
-    'Los Angeles': (34.0522, -118.2437),
-    'Chicago': (41.8781, -87.6298),
-    'Houston': (29.7604, -95.3698),
-    'Phoenix': (33.4484, -112.0740),
-    'Philadelphia': (39.9526, -75.1652),
-    'San Antonio': (29.4241, -98.4936),
-    'San Diego': (32.7157, -117.1611),
-    'Dallas': (32.7767, -96.7970),
-    'San Jose': (37.3382, -121.8863),
-    'Austin': (30.2672, -97.7431),
-    'Jacksonville': (30.3322, -81.6557),
-    'Fort Worth': (32.7555, -97.3308),
-    'Columbus': (39.9612, -82.9988),
-    'San Francisco': (37.7749, -122.4194),
-    'Charlotte': (35.2271, -80.8431),
-    'Indianapolis': (39.7684, -86.1581),
-    'Seattle': (47.6062, -122.3321),
-    'Denver': (39.7392, -104.9903),
-    'Washington': (38.9072, -77.0369),
-    'Boston': (42.3601, -71.0589),
-    'Nashville': (36.1627, -86.7816),
-    'Baltimore': (39.2904, -76.6122),
-    'Portland': (45.5155, -122.6789),
-    'Las Vegas': (36.1699, -115.1398),
-    'Milwaukee': (43.0389, -87.9065),
-    'Albuquerque': (35.0844, -106.6504),
-    'Tucson': (32.2226, -110.9747),
-    'Sacramento': (38.5816, -121.4944),
-    'Kansas City': (39.0997, -94.5786),
-    'Miami': (25.7617, -80.1918),
-    'Tampa': (27.9506, -82.4572),
-    'Orlando': (28.5383, -81.3792),
-    'Pittsburgh': (40.4406, -79.9959),
-    'Cincinnati': (39.1031, -84.5120),
-    'Minneapolis': (44.9778, -93.2650),
-    'Cleveland': (41.4993, -81.6944),
-    'Detroit': (42.3314, -83.0458),
-    'Salt Lake City': (40.7608, -111.8910),
-    'St. Louis': (38.6270, -90.1994),
-    'Atlanta': (33.7490, -84.3880),
-    'Raleigh': (35.7796, -78.6382),
-    'Memphis': (35.1495, -90.0490),
-    'Richmond': (37.5407, -77.4360),
-    'Buffalo': (42.8864, -78.8784),
-    'Oklahoma City': (35.4676, -97.5164)
+    "United States": (39.8283, -98.5795),  # Geographic center of the contiguous US
+    "New York": (40.7128, -74.0060),
+    "Los Angeles": (34.0522, -118.2437),
+    "Chicago": (41.8781, -87.6298),
+    "Dallas": (32.7767, -96.7970),
+    "Houston": (29.7604, -95.3698),
+    "Washington": (38.9072, -77.0369),
+    "Philadelphia": (39.9526, -75.1652),
+    "Miami": (25.7617, -80.1918),
+    "Atlanta": (33.7490, -84.3880),
+    "Boston": (42.3601, -71.0589),
+    "Phoenix": (33.4484, -112.0740),
+    "San Francisco": (37.7749, -122.4194),
+    "Riverside": (33.9806, -117.3755),
+    "Detroit": (42.3314, -83.0458),
+    "Seattle": (47.6062, -122.3321),
+    "Minneapolis": (44.9778, -93.2650),
+    "San Diego": (32.7157, -117.1611),
+    "Tampa": (27.9506, -82.4572),
+    "Denver": (39.7392, -104.9903),
+    "Baltimore": (39.2904, -76.6122),
+    "St. Louis": (38.6270, -90.1994),
+    "Charlotte": (35.2271, -80.8431),
+    "Orlando": (28.5383, -81.3792),
+    "San Antonio": (29.4241, -98.4936),
+    "Portland": (45.5155, -122.6789),
+    "Sacramento": (38.5816, -121.4944),
+    "Pittsburgh": (40.4406, -79.9959),
+    "Las Vegas": (36.1699, -115.1398),
+    "Austin": (30.2672, -97.7431),
+    "Cincinnati": (39.1031, -84.5120),
+    "Kansas City": (39.0997, -94.5786),
+    "Columbus": (39.9612, -82.9988),
+    "Indianapolis": (39.7684, -86.1581),
+    "Cleveland": (41.4993, -81.6944),
+    "Nashville": (36.1627, -86.7816),
+    "Virginia Beach": (36.8529, -75.9780),
+    "Providence": (41.8240, -71.4128),
+    "Milwaukee": (43.0389, -87.9065),
+    "Jacksonville": (30.3322, -81.6557),
+    "Oklahoma City": (35.4676, -97.5164),
+    "Raleigh": (35.7796, -78.6382),
+    "Memphis": (35.1495, -90.0490),
+    "Richmond": (37.5407, -77.4360),
+    "Buffalo": (42.8864, -78.8784),
+    "Salt Lake City": (40.7608, -111.8910),
+    "Rochester": (43.1566, -77.6088),
+    "Grand Rapids": (42.9634, -85.6681),
+    "Tucson": (32.2226, -110.9747),
+    "Urban Honolulu": (21.3069, -157.8583),
+    "Fresno": (36.7378, -119.7871),
+    "Worcester": (42.2626, -71.8023),
+    "Albuquerque": (35.0844, -106.6504),
+    "Omaha": (41.2565, -95.9345),
+    "Albany": (42.6526, -73.7562),
+    "New Orleans": (29.9511, -90.0715),
+    "Bakersfield": (35.3733, -119.0187),
+    "Knoxville": (35.9606, -83.9207),
+    "Ogden": (41.2230, -111.9738),
+    "Allentown": (40.6084, -75.4902),
+    "Baton Rouge": (30.4515, -91.1871),
+    "McAllen": (26.2034, -98.2300),
+    "Dayton": (39.7589, -84.1916),
+    "Columbia": (34.0007, -81.0348),
+    "Greensboro": (36.0726, -79.7920),
+    "Akron": (41.0814, -81.5190),
+    "Little Rock": (34.7465, -92.2896),
+    "Stockton": (37.9577, -121.2908),
+    "Colorado Springs": (38.8339, -104.8214),
+    "Charleston": (32.7765, -79.9311),
+    "Syracuse": (43.0481, -76.1474),
+    "Winston-Salem": (36.0999, -80.2442),
+    "Greenville": (34.8526, -82.3940),
+    "Wichita": (37.6872, -97.3301),
+    "Cape Coral": (26.5629, -81.9495),
+    "Boise City": (43.6150, -116.2023),
+    "Springfield": (42.1015, -72.5898),
+    "Toledo": (41.6639, -83.5552),
+    "Lakeland": (28.0395, -81.9498),
+    "Madison": (43.0731, -89.4012)
 }
 
 def clean_metro_name(metro):
     """Clean metro name by removing state and other info"""
+    # Skip cleaning for "United States"
+    if metro == "United States":
+        return metro
+        
     # Debug the input
     st.write(f"Debug - Input metro name: {metro}")
     
@@ -133,6 +171,10 @@ def clean_metro_name(metro):
 def get_metro_coordinates(metro, state):
     """Get coordinates for a metro area using hardcoded values or Nominatim"""
     try:
+        # Skip geocoding for "United States"
+        if metro == "United States":
+            return METRO_COORDINATES["United States"]
+            
         # Clean the metro name to match our hardcoded values
         metro_key = clean_metro_name(metro)
         st.write(f"Debug - Looking up coordinates for: {metro_key}")
@@ -142,9 +184,12 @@ def get_metro_coordinates(metro, state):
             st.write(f"Debug - Found hardcoded coordinates for {metro_key}")
             return METRO_COORDINATES[metro_key]
             
-        # Clean up state (remove duplicates)
-        state = re.sub(r'([A-Z]{2}),\s*\1', r'\1', state)
-        state = state.strip()
+        # Clean up state (remove duplicates and handle nan)
+        if pd.isna(state):
+            state = ""
+        else:
+            state = re.sub(r'([A-Z]{2}),\s*\1', r'\1', state)
+            state = state.strip()
         
         st.write(f"Debug - No hardcoded coordinates, trying geocoding with state: {state}")
         
@@ -153,9 +198,9 @@ def get_metro_coordinates(metro, state):
         
         # Try different query formats
         queries = [
-            f"{metro_key}, {state}, USA",  # Full format with cleaned name
-            f"{metro_key}, USA",           # Just cleaned city and country
-            metro_key                      # Just cleaned city
+            f"{metro_key}, {state}, USA" if state else f"{metro_key}, USA",  # Full format
+            f"{metro_key}, USA",  # Just city and country
+            metro_key  # Just city
         ]
         
         st.write(f"Debug - Will try these queries: {queries}")
