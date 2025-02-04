@@ -112,11 +112,21 @@ METRO_COORDINATES = {
 
 def clean_metro_name(metro):
     """Clean metro name by removing state and other info"""
+    # Debug the input
+    st.write(f"Debug - Input metro name: {metro}")
+    
+    # Handle cases where state is duplicated (e.g., "Los Angeles, CA, CA")
+    metro = re.sub(r',\s*([A-Z]{2}),\s*\1', r', \1', metro)
+    
     # Remove any state abbreviations (e.g., ", CA", ", NY")
     metro = re.sub(r',\s*[A-Z]{2}.*$', '', metro)
+    
     # Remove any other suffixes like "Metro Area", "County", etc.
     metro = re.sub(r'\s*(Metro.*|County|City|Area).*$', '', metro, flags=re.IGNORECASE)
-    return metro.strip()
+    
+    cleaned = metro.strip()
+    st.write(f"Debug - Cleaned metro name: {cleaned}")
+    return cleaned
 
 @st.cache_data
 def get_metro_coordinates(metro, state):
@@ -124,13 +134,19 @@ def get_metro_coordinates(metro, state):
     try:
         # Clean the metro name to match our hardcoded values
         metro_key = clean_metro_name(metro)
-        st.write(f"Debug - Original metro: {metro}, Cleaned metro: {metro_key}")  # Debug line
+        st.write(f"Debug - Looking up coordinates for: {metro_key}")
         
         # First check if we have hardcoded coordinates
         if metro_key in METRO_COORDINATES:
-            st.write(f"Debug - Found hardcoded coordinates for {metro_key}")  # Debug line
+            st.write(f"Debug - Found hardcoded coordinates for {metro_key}")
             return METRO_COORDINATES[metro_key]
             
+        # Clean up state (remove duplicates)
+        state = re.sub(r'([A-Z]{2}),\s*\1', r'\1', state)
+        state = state.strip()
+        
+        st.write(f"Debug - No hardcoded coordinates, trying geocoding with state: {state}")
+        
         # If not found in hardcoded values, try geocoding
         geolocator = Nominatim(user_agent="zillow_dashboard")
         
@@ -141,31 +157,25 @@ def get_metro_coordinates(metro, state):
             metro_key                      # Just cleaned city
         ]
         
+        st.write(f"Debug - Will try these queries: {queries}")
+        
         for query in queries:
             try:
+                st.write(f"Debug - Trying query: {query}")
                 location = geolocator.geocode(query, timeout=5)  # Increased timeout
                 if location:
+                    st.write(f"Debug - Found coordinates for query: {query}")
                     return location.latitude, location.longitude
             except Exception as e:
+                st.write(f"Debug - Query failed: {query}, Error: {str(e)}")
                 continue
-                
-        # If all queries fail, try one last time with error logging
-        location = geolocator.geocode(f"{metro_key}, {state}, USA", timeout=10)
-        if location:
-            return location.latitude, location.longitude
-            
+        
         st.warning(f"Could not find coordinates for {metro_key}, {state}")
         return None
         
     except Exception as e:
         st.warning(f"Error getting coordinates for {metro}, {state}: {str(e)}")
         return None
-
-# Sidebar for navigation
-category = st.sidebar.selectbox(
-    "Choose a Dashboard",
-    ["Market Overview", "Market Analysis", "Market Activity", "Market Heatmap"]
-)
 
 def melt_data(df, id_cols=None):
     """Convert wide format data to long format"""
@@ -504,6 +514,9 @@ def calculate_all_metro_scores():
             try:
                 # Get state for this metro
                 state = data['home_values'][data['home_values']['RegionName'] == metro]['StateName'].iloc[0]
+                
+                # Clean up state name if needed
+                state = re.sub(r'([A-Z]{2}),\s*\1', r'\1', state).strip()
                 
                 # Get metro data
                 metro_mask = (data['home_values']['RegionName'] == metro)
