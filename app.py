@@ -10,6 +10,7 @@ from scipy.signal import detrend
 from statsmodels.tsa.seasonal import seasonal_decompose
 import warnings
 warnings.filterwarnings('ignore')
+import re
 
 # Configure the page
 st.set_page_config(page_title="Zillow Data Dashboard", layout="wide")
@@ -109,13 +110,25 @@ METRO_COORDINATES = {
     'Oklahoma City': (35.4676, -97.5164)
 }
 
+def clean_metro_name(metro):
+    """Clean metro name by removing state and other info"""
+    # Remove any state abbreviations (e.g., ", CA", ", NY")
+    metro = re.sub(r',\s*[A-Z]{2}.*$', '', metro)
+    # Remove any other suffixes like "Metro Area", "County", etc.
+    metro = re.sub(r'\s*(Metro.*|County|City|Area).*$', '', metro, flags=re.IGNORECASE)
+    return metro.strip()
+
 @st.cache_data
 def get_metro_coordinates(metro, state):
     """Get coordinates for a metro area using hardcoded values or Nominatim"""
     try:
+        # Clean the metro name to match our hardcoded values
+        metro_key = clean_metro_name(metro)
+        st.write(f"Debug - Original metro: {metro}, Cleaned metro: {metro_key}")  # Debug line
+        
         # First check if we have hardcoded coordinates
-        metro_key = metro.split(',')[0].strip()  # Remove any state/county info
         if metro_key in METRO_COORDINATES:
+            st.write(f"Debug - Found hardcoded coordinates for {metro_key}")  # Debug line
             return METRO_COORDINATES[metro_key]
             
         # If not found in hardcoded values, try geocoding
@@ -123,9 +136,9 @@ def get_metro_coordinates(metro, state):
         
         # Try different query formats
         queries = [
-            f"{metro}, {state}, USA",  # Full format
-            f"{metro}, USA",           # Just city and country
-            metro                      # Just city
+            f"{metro_key}, {state}, USA",  # Full format with cleaned name
+            f"{metro_key}, USA",           # Just cleaned city and country
+            metro_key                      # Just cleaned city
         ]
         
         for query in queries:
@@ -137,11 +150,11 @@ def get_metro_coordinates(metro, state):
                 continue
                 
         # If all queries fail, try one last time with error logging
-        location = geolocator.geocode(f"{metro}, {state}, USA", timeout=10)
+        location = geolocator.geocode(f"{metro_key}, {state}, USA", timeout=10)
         if location:
             return location.latitude, location.longitude
             
-        st.warning(f"Could not find coordinates for {metro}, {state}")
+        st.warning(f"Could not find coordinates for {metro_key}, {state}")
         return None
         
     except Exception as e:
