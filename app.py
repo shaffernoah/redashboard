@@ -15,6 +15,40 @@ warnings.filterwarnings('ignore')
 st.set_page_config(page_title="Zillow Data Dashboard", layout="wide")
 
 # Load data at app startup
+@st.cache_data
+def load_all_data():
+    """Load all available Zillow data files"""
+    try:
+        data = {}
+        # Load each file with error handling
+        files = {
+            'home_values': "Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
+            'rentals': "Metro_zori_uc_sfrcondomfr_sm_month.csv",
+            'inventory': "Metro_invt_fs_uc_sfrcondo_sm_week.csv",
+            'list_price': "Metro_mlp_uc_sfrcondo_sm_week.csv",
+            'new_listings': "Metro_new_listings_uc_sfrcondo_week.csv",
+            'sold_above': "Metro_pct_sold_above_list_uc_sfrcondo_week.csv"
+        }
+        
+        for key, filename in files.items():
+            try:
+                df = pd.read_csv(filename)
+                # Ensure RegionName and StateName columns exist and are string type
+                if 'RegionName' in df.columns:
+                    df['RegionName'] = df['RegionName'].astype(str)
+                if 'StateName' in df.columns:
+                    df['StateName'] = df['StateName'].astype(str)
+                data[key] = df
+            except Exception as e:
+                st.warning(f"Could not load {filename}: {str(e)}")
+                # Provide empty DataFrame with required columns
+                data[key] = pd.DataFrame(columns=['RegionName', 'StateName', 'Value'])
+        
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        return None
+
 try:
     data = load_all_data()
     data_loaded = True
@@ -30,6 +64,332 @@ category = st.sidebar.selectbox(
     "Choose a Dashboard",
     ["Market Overview", "Market Analysis", "Market Activity", "Market Heatmap"]
 )
+
+def melt_data(df, id_cols=None):
+    """Convert wide format data to long format"""
+    try:
+        if df.empty:
+            return pd.DataFrame(columns=['Date', 'Value'])
+            
+        if id_cols is None:
+            id_cols = ['RegionID', 'SizeRank', 'RegionName', 'RegionType', 'StateName']
+            # Only use columns that exist in the DataFrame
+            id_cols = [col for col in id_cols if col in df.columns]
+        
+        # Get value columns (all columns not in id_cols)
+        value_vars = [col for col in df.columns if col not in id_cols]
+        
+        if not value_vars:
+            return pd.DataFrame(columns=['Date', 'Value'])
+        
+        melted = df.melt(
+            id_vars=id_cols,
+            value_vars=value_vars,
+            var_name='Date',
+            value_name='Value'
+        )
+        
+        # Convert date strings to datetime, with error handling
+        try:
+            melted['Date'] = pd.to_datetime(melted['Date'])
+        except:
+            melted['Date'] = pd.to_datetime('today')
+            
+        return melted
+    except Exception as e:
+        st.warning(f"Error melting data: {str(e)}")
+        return pd.DataFrame(columns=['Date', 'Value'])
+
+def safe_get_value(df, col='Value', position=-1, default=0):
+    """Safely get a value from a DataFrame, returning default if not found"""
+    try:
+        if df.empty:
+            return default
+        return df[col].iloc[position]
+    except (IndexError, KeyError):
+        return default
+
+def safe_calculate_metrics(df, value_col='Value'):
+    """Calculate metrics with error handling"""
+    try:
+        if df.empty:
+            return {
+                'current_value': 0,
+                'yoy_change': 0,
+                'avg_monthly_change': 0
+            }
+        
+        current_value = df[value_col].iloc[-1]
+        year_ago_value = df[value_col].iloc[-13] if len(df) > 13 else df[value_col].iloc[0]
+        yoy_change = ((current_value - year_ago_value) / year_ago_value) * 100
+        monthly_changes = df[value_col].pct_change() * 100
+        avg_monthly_change = monthly_changes.tail(12).mean()
+        
+        return {
+            'current_value': current_value,
+            'yoy_change': yoy_change,
+            'avg_monthly_change': avg_monthly_change
+        }
+    except (IndexError, KeyError):
+        return {
+            'current_value': 0,
+            'yoy_change': 0,
+            'avg_monthly_change': 0
+        }
+
+def calculate_market_momentum(price_data, inventory_data, sold_above_data):
+    """Calculate market momentum score (0-100)"""
+    try:
+        scores = []
+        
+        # Price appreciation score (0-25)
+        if not price_data.empty:
+            yoy_change = ((price_data['Value'].iloc[-1] - price_data['Value'].iloc[-13]) / 
+                         price_data['Value'].iloc[-13]) * 100
+            price_score = min(max(yoy_change + 10, 0), 25)  # Scale and cap
+            scores.append(price_score)
+        
+        # Inventory change score (0-25)
+        if not inventory_data.empty:
+            inv_change = ((inventory_data['Value'].iloc[-1] - inventory_data['Value'].iloc[-13]) / 
+                         inventory_data['Value'].iloc[-13]) * 100
+            inv_score = min(max(25 - inv_change, 0), 25)  # Inverse scale (lower inventory = higher score)
+            scores.append(inv_score)
+        
+        # Sold above list score (0-25)
+        if not sold_above_data.empty:
+            sold_above = sold_above_data['Value'].iloc[-1]
+            sold_score = min(max(sold_above, 0), 25)
+            scores.append(sold_score)
+        
+        # Market velocity score (0-25)
+        if not price_data.empty:
+            recent_changes = price_data['Value'].pct_change().tail(6).mean() * 100
+            velocity_score = min(max(recent_changes * 5 + 12.5, 0), 25)  # Scale and center
+            scores.append(velocity_score)
+        
+        if scores:
+            return sum(scores) / len(scores) * (100 / 25)  # Normalize to 0-100
+        return 50  # Default neutral score
+    except Exception as e:
+        st.warning(f"Error calculating market momentum: {str(e)}")
+        return 50
+
+def calculate_price_rent_ratio(price_data, rental_data):
+    """Calculate price-to-rent ratio and investment metrics"""
+    try:
+        if price_data.empty or rental_data.empty:
+            return None
+            
+        # Calculate monthly P/R ratio
+        merged = pd.merge(price_data, rental_data, on='Date', suffixes=('_price', '_rent'))
+        merged['pr_ratio'] = merged['Value_price'] / (merged['Value_rent'] * 12)  # Annual rent
+        
+        # Calculate historical metrics
+        current_ratio = merged['pr_ratio'].iloc[-1]
+        mean_ratio = merged['pr_ratio'].mean()
+        std_ratio = merged['pr_ratio'].std()
+        z_score = (current_ratio - mean_ratio) / std_ratio
+        
+        # Calculate trend scores
+        price_trend = merged['Value_price'].pct_change(12).iloc[-1] * 100
+        rent_trend = merged['Value_rent'].pct_change(12).iloc[-1] * 100
+        
+        # Investment score (0-100)
+        # Lower P/R ratio, higher rent growth = better investment
+        pr_score = max(0, min(50 - z_score * 10, 50))  # P/R component
+        trend_score = max(0, min(rent_trend * 2, 50))  # Rent trend component
+        investment_score = pr_score + trend_score
+        
+        return {
+            'current_ratio': current_ratio,
+            'historical_mean': mean_ratio,
+            'z_score': z_score,
+            'price_trend': price_trend,
+            'rent_trend': rent_trend,
+            'investment_score': investment_score,
+            'pr_series': merged[['Date', 'pr_ratio']].copy()
+        }
+    except Exception as e:
+        st.warning(f"Error calculating P/R ratio: {str(e)}")
+        return None
+
+def analyze_market_cycle(price_data, periods=12):
+    """Analyze market cycle position using time series decomposition"""
+    try:
+        if price_data.empty or len(price_data) < periods * 2:
+            return None
+            
+        # Resample to monthly frequency and handle missing values
+        monthly_data = price_data.set_index('Date').resample('M')['Value'].mean()
+        
+        # Interpolate missing values
+        monthly_data = monthly_data.interpolate(method='cubic', limit_direction='both')
+        
+        # Need at least 2 full years of data after interpolation
+        if len(monthly_data.dropna()) < periods * 2:
+            return None
+            
+        # Ensure we have enough non-NaN values
+        if monthly_data.isna().sum() > len(monthly_data) * 0.3:  # If more than 30% missing
+            return None
+            
+        try:
+            # Perform seasonal decomposition
+            decomposition = seasonal_decompose(monthly_data, period=periods, extrapolate_trend='freq')
+            
+            # Handle potential NaN values in components
+            trend = pd.Series(decomposition.trend).interpolate(method='linear')
+            seasonal = pd.Series(decomposition.seasonal).interpolate(method='linear')
+            residual = pd.Series(decomposition.resid).interpolate(method='linear')
+            
+            # Determine cycle position
+            recent_trend = trend.diff().tail(6).mean()
+            recent_residual = residual.tail(6).mean()
+            
+            # Classify market phase
+            if recent_trend > 0:
+                if recent_residual > 0:
+                    phase = "Expansion"
+                    angle = 45
+                else:
+                    phase = "Peak"
+                    angle = 135
+            else:
+                if recent_residual < 0:
+                    phase = "Contraction"
+                    angle = 225
+                else:
+                    phase = "Trough"
+                    angle = 315
+            
+            # Calculate confidence (0-100)
+            # Lower confidence if we had to interpolate a lot
+            missing_penalty = (monthly_data.isna().sum() / len(monthly_data)) * 25
+            trend_strength = abs(recent_trend) / trend.std()
+            residual_strength = abs(recent_residual) / residual.std()
+            confidence = max(0, min((trend_strength + residual_strength) * 25 - missing_penalty, 100))
+            
+            return {
+                'phase': phase,
+                'angle': angle,
+                'confidence': confidence,
+                'components': {
+                    'trend': trend,
+                    'seasonal': seasonal,
+                    'residual': residual
+                }
+            }
+        except Exception as e:
+            st.warning(f"Error in decomposition: {str(e)}")
+            return None
+            
+    except Exception as e:
+        st.warning(f"Error analyzing market cycle: {str(e)}")
+        return None
+
+def calculate_market_imbalance(inventory_data, price_data, new_listings_data):
+    """Calculate supply-demand imbalance metrics"""
+    try:
+        if inventory_data.empty or price_data.empty or new_listings_data.empty:
+            return None
+            
+        # Calculate recent changes
+        inv_change = inventory_data['Value'].pct_change(12).iloc[-1]
+        price_change = price_data['Value'].pct_change(12).iloc[-1]
+        new_listings_change = new_listings_data['Value'].pct_change(12).iloc[-1]
+        
+        # Calculate absorption rate (new listings vs inventory)
+        absorption = new_listings_data['Value'].iloc[-1] / inventory_data['Value'].iloc[-1]
+        
+        # Calculate imbalance scores
+        supply_score = inv_change * -100  # Negative inventory change = positive score
+        demand_score = price_change * 100  # Positive price change = positive score
+        
+        # Combined market pressure score (-100 to 100)
+        # Positive = seller's market, Negative = buyer's market
+        market_pressure = (supply_score + demand_score) / 2
+        
+        return {
+            'market_pressure': market_pressure,
+            'absorption_rate': absorption,
+            'inventory_change': inv_change,
+            'price_change': price_change,
+            'new_listings_change': new_listings_change
+        }
+    except Exception as e:
+        st.warning(f"Error calculating market imbalance: {str(e)}")
+        return None
+
+def calculate_volatility_metrics(price_data, sold_above_data, periods=12):
+    """Calculate market stability and risk metrics"""
+    try:
+        if price_data.empty:
+            return None
+            
+        # Calculate price volatility
+        returns = price_data['Value'].pct_change()
+        volatility = returns.std() * np.sqrt(12)  # Annualized
+        
+        # Calculate rolling volatility
+        rolling_vol = returns.rolling(periods).std() * np.sqrt(12)
+        
+        # Calculate price momentum
+        momentum = returns.rolling(periods).mean()
+        
+        # Calculate market consistency
+        if not sold_above_data.empty:
+            sold_above_volatility = sold_above_data['Value'].rolling(periods).std()
+        else:
+            sold_above_volatility = None
+        
+        # Calculate risk score (0-100)
+        # Lower volatility = better score
+        risk_score = max(0, min(100 - volatility * 100, 100))
+        
+        return {
+            'volatility': volatility,
+            'rolling_volatility': rolling_vol,
+            'momentum': momentum,
+            'sold_above_volatility': sold_above_volatility,
+            'risk_score': risk_score
+        }
+    except Exception as e:
+        st.warning(f"Error calculating volatility metrics: {str(e)}")
+        return None
+
+def calculate_relative_metrics(metro_data, state_data, national_data):
+    """Calculate relative performance metrics"""
+    try:
+        if metro_data.empty or state_data.empty or national_data.empty:
+            return None
+            
+        # Calculate YoY changes
+        metro_change = metro_data['Value'].pct_change(12).iloc[-1]
+        state_change = state_data['Value'].pct_change(12).iloc[-1]
+        national_change = national_data['Value'].pct_change(12).iloc[-1]
+        
+        # Calculate relative performance
+        vs_state = metro_change - state_change
+        vs_national = metro_change - national_change
+        
+        # Calculate percentile rank
+        all_changes = pd.concat([
+            metro_data['Value'].pct_change(12),
+            state_data['Value'].pct_change(12),
+            national_data['Value'].pct_change(12)
+        ])
+        percentile = stats.percentileofscore(all_changes.dropna(), metro_change)
+        
+        return {
+            'metro_change': metro_change,
+            'vs_state': vs_state,
+            'vs_national': vs_national,
+            'percentile': percentile
+        }
+    except Exception as e:
+        st.warning(f"Error calculating relative metrics: {str(e)}")
+        return None
 
 def plot_market_pressure_gauge(imbalance_data):
     """Create a gauge chart for market pressure"""
