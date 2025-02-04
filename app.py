@@ -538,6 +538,72 @@ def calculate_all_metro_scores():
         st.error(f"Error calculating metro scores: {str(e)}")
         return pd.DataFrame()
 
+def generate_metro_scores_csv():
+    """Generate a CSV with all metro scores and coordinates"""
+    try:
+        # Get all metro areas
+        metros = data['home_values']['RegionName'].unique()
+        scores = []
+        
+        # Create a progress bar
+        progress_bar = st.progress(0)
+        total_metros = len(metros)
+        
+        for i, metro in enumerate(metros):
+            try:
+                # Get state for this metro
+                state = data['home_values'][data['home_values']['RegionName'] == metro]['StateName'].iloc[0]
+                
+                # Clean up state name if needed
+                state = re.sub(r'([A-Z]{2}),\s*\1', r'\1', state).strip()
+                
+                # Get metro data
+                metro_mask = (data['home_values']['RegionName'] == metro)
+                metro_prices = melt_data(data['home_values'][metro_mask])
+                metro_rentals = melt_data(data['rentals'][metro_mask])
+                
+                # Calculate metrics
+                pr_data = calculate_price_rent_ratio(metro_prices, metro_rentals)
+                
+                if pr_data:
+                    # Get coordinates
+                    coords = get_metro_coordinates(metro, state)
+                    if coords:
+                        lat, lon = coords
+                        
+                        scores.append({
+                            'metro': metro,
+                            'state': state,
+                            'latitude': lat,
+                            'longitude': lon,
+                            'investment_score': pr_data['investment_score'],
+                            'price_trend': pr_data['price_trend'],
+                            'rent_trend': pr_data['rent_trend'],
+                            'pr_ratio': pr_data['current_ratio']
+                        })
+                        
+            except Exception as e:
+                st.warning(f"Error processing {metro}: {str(e)}")
+                continue
+                
+            # Update progress
+            progress_bar.progress((i + 1) / total_metros)
+        
+        # Clear progress bar
+        progress_bar.empty()
+        
+        if scores:
+            # Convert to DataFrame and save to CSV
+            scores_df = pd.DataFrame(scores)
+            scores_df.to_csv('metro_data.csv', index=False)
+            st.success("Successfully generated metro_data.csv!")
+            return scores_df
+        return pd.DataFrame()
+        
+    except Exception as e:
+        st.error(f"Error generating metro scores: {str(e)}")
+        return pd.DataFrame()
+
 def plot_market_pressure_gauge(imbalance_data):
     """Create a gauge chart for market pressure"""
     if not imbalance_data:
@@ -687,6 +753,66 @@ category = st.sidebar.selectbox(
     "Choose a Dashboard",
     ["Market Overview", "Market Analysis", "Market Activity", "Market Heatmap"]
 )
+
+# Add a button to generate the CSV
+if st.sidebar.button("Generate Metro Data CSV"):
+    st.sidebar.write("Generating metro data CSV... This may take a few minutes.")
+    generate_metro_scores_csv()
+
+# Load metro data from CSV if it exists
+@st.cache_data
+def load_metro_data():
+    """Load metro data from CSV file"""
+    try:
+        return pd.read_csv('metro_data.csv')
+    except Exception:
+        return pd.DataFrame()
+
+# Use cached metro data for the heatmap
+def plot_investment_heatmap():
+    """Plot investment score heatmap using pre-calculated data"""
+    try:
+        # Load pre-calculated metro data
+        metro_data = load_metro_data()
+        
+        if metro_data.empty:
+            st.warning("No pre-calculated metro data found. Please generate the data first.")
+            return None
+            
+        # Create the heatmap
+        fig = px.scatter_mapbox(
+            metro_data,
+            lat='latitude',
+            lon='longitude',
+            color='investment_score',
+            size='investment_score',
+            hover_name='metro',
+            hover_data={
+                'state': True,
+                'investment_score': ':.2f',
+                'price_trend': ':.2%',
+                'rent_trend': ':.2%',
+                'pr_ratio': ':.2f',
+                'latitude': False,
+                'longitude': False
+            },
+            color_continuous_scale='RdYlGn',
+            size_max=30,
+            zoom=3,
+            title='Investment Score Heatmap'
+        )
+        
+        fig.update_layout(
+            mapbox_style='light',
+            margin={"r":0,"t":30,"l":0,"b":0},
+            height=600
+        )
+        
+        return fig
+        
+    except Exception as e:
+        st.error(f"Error plotting heatmap: {str(e)}")
+        return None
 
 # Main dashboard logic
 if data_loaded:
