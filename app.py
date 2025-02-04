@@ -11,6 +11,8 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 import warnings
 warnings.filterwarnings('ignore')
 import re
+import json
+import os
 
 # Configure the page
 st.set_page_config(page_title="Zillow Data Dashboard", layout="wide")
@@ -145,6 +147,25 @@ METRO_COORDINATES = {
     "Madison": (43.0731, -89.4012)
 }
 
+# Load cached coordinates from file if it exists
+CACHE_FILE = "metro_coordinates_cache.json"
+CACHED_COORDINATES = {}
+
+if os.path.exists(CACHE_FILE):
+    try:
+        with open(CACHE_FILE, 'r') as f:
+            CACHED_COORDINATES = json.load(f)
+    except Exception:
+        pass
+
+def save_coordinates_cache():
+    """Save the coordinates cache to file"""
+    try:
+        with open(CACHE_FILE, 'w') as f:
+            json.dump(CACHED_COORDINATES, f)
+    except Exception:
+        pass
+
 def clean_metro_name(metro):
     """Clean metro name by removing state and other info"""
     # Skip cleaning for "United States"
@@ -177,6 +198,11 @@ def get_metro_coordinates(metro, state):
         if metro_key in METRO_COORDINATES:
             return METRO_COORDINATES[metro_key]
             
+        # Check if we have cached coordinates
+        cache_key = f"{metro_key}_{state}" if state else metro_key
+        if cache_key in CACHED_COORDINATES:
+            return tuple(CACHED_COORDINATES[cache_key])
+            
         # Clean up state (remove duplicates and handle nan)
         if pd.isna(state):
             state = ""
@@ -184,7 +210,7 @@ def get_metro_coordinates(metro, state):
             state = re.sub(r'([A-Z]{2}),\s*\1', r'\1', state)
             state = state.strip()
         
-        # If not found in hardcoded values, try geocoding
+        # If not found in hardcoded values or cache, try geocoding
         geolocator = Nominatim(user_agent="zillow_dashboard")
         
         # Try different query formats
@@ -198,6 +224,9 @@ def get_metro_coordinates(metro, state):
             try:
                 location = geolocator.geocode(query, timeout=5)
                 if location:
+                    # Cache the coordinates
+                    CACHED_COORDINATES[cache_key] = [location.latitude, location.longitude]
+                    save_coordinates_cache()
                     return location.latitude, location.longitude
             except Exception:
                 continue
@@ -542,7 +571,11 @@ def calculate_all_metro_scores():
         metros = data['home_values']['RegionName'].unique()
         scores = []
         
-        for metro in metros:
+        # Create a progress bar
+        progress_bar = st.progress(0)
+        total_metros = len(metros)
+        
+        for i, metro in enumerate(metros):
             try:
                 # Get state for this metro
                 state = data['home_values'][data['home_values']['RegionName'] == metro]['StateName'].iloc[0]
@@ -574,9 +607,16 @@ def calculate_all_metro_scores():
                             'rent_trend': pr_data['rent_trend'],
                             'pr_ratio': pr_data['current_ratio']
                         })
+                        
             except Exception as e:
                 st.warning(f"Error processing {metro}: {str(e)}")
                 continue
+                
+            # Update progress
+            progress_bar.progress((i + 1) / total_metros)
+        
+        # Clear progress bar
+        progress_bar.empty()
         
         if scores:
             return pd.DataFrame(scores)
@@ -717,11 +757,11 @@ def plot_relative_performance(relative_data):
                 'value': 50
             },
             'steps': [
-                {'range': [0, 20], 'color': "lightcoral"},
-                {'range': [20, 40], 'color': "lightyellow"},
-                {'range': [40, 60], 'color': "lightgreen"},
-                {'range': [60, 80], 'color': "lightyellow"},
-                {'range': [80, 100], 'color': "lightcoral"}
+                {'range': [0, 20], 'color': 'lightcoral'},
+                {'range': [20, 40], 'color': 'lightyellow'},
+                {'range': [40, 60], 'color': 'lightgreen'},
+                {'range': [60, 80], 'color': 'lightyellow'},
+                {'range': [80, 100], 'color': 'lightcoral'}
             ],
             'bar': {'color': "darkblue"}
         }
