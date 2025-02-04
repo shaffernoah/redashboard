@@ -151,9 +151,6 @@ def clean_metro_name(metro):
     if metro == "United States":
         return metro
         
-    # Debug the input
-    st.write(f"Debug - Input metro name: {metro}")
-    
     # Handle cases where state is duplicated (e.g., "Los Angeles, CA, CA")
     metro = re.sub(r',\s*([A-Z]{2}),\s*\1', r', \1', metro)
     
@@ -163,9 +160,7 @@ def clean_metro_name(metro):
     # Remove any other suffixes like "Metro Area", "County", etc.
     metro = re.sub(r'\s*(Metro.*|County|City|Area).*$', '', metro, flags=re.IGNORECASE)
     
-    cleaned = metro.strip()
-    st.write(f"Debug - Cleaned metro name: {cleaned}")
-    return cleaned
+    return metro.strip()
 
 @st.cache_data
 def get_metro_coordinates(metro, state):
@@ -177,11 +172,9 @@ def get_metro_coordinates(metro, state):
             
         # Clean the metro name to match our hardcoded values
         metro_key = clean_metro_name(metro)
-        st.write(f"Debug - Looking up coordinates for: {metro_key}")
         
         # First check if we have hardcoded coordinates
         if metro_key in METRO_COORDINATES:
-            st.write(f"Debug - Found hardcoded coordinates for {metro_key}")
             return METRO_COORDINATES[metro_key]
             
         # Clean up state (remove duplicates and handle nan)
@@ -190,8 +183,6 @@ def get_metro_coordinates(metro, state):
         else:
             state = re.sub(r'([A-Z]{2}),\s*\1', r'\1', state)
             state = state.strip()
-        
-        st.write(f"Debug - No hardcoded coordinates, trying geocoding with state: {state}")
         
         # If not found in hardcoded values, try geocoding
         geolocator = Nominatim(user_agent="zillow_dashboard")
@@ -203,17 +194,12 @@ def get_metro_coordinates(metro, state):
             metro_key  # Just city
         ]
         
-        st.write(f"Debug - Will try these queries: {queries}")
-        
         for query in queries:
             try:
-                st.write(f"Debug - Trying query: {query}")
-                location = geolocator.geocode(query, timeout=5)  # Increased timeout
+                location = geolocator.geocode(query, timeout=5)
                 if location:
-                    st.write(f"Debug - Found coordinates for query: {query}")
                     return location.latitude, location.longitude
-            except Exception as e:
-                st.write(f"Debug - Query failed: {query}, Error: {str(e)}")
+            except Exception:
                 continue
         
         st.warning(f"Could not find coordinates for {metro_key}, {state}")
@@ -761,7 +747,7 @@ if data_loaded:
             
         if not metro_scores_df.empty:
             # Debug information
-            st.write(f"Debug - Found {len(metro_scores_df)} metros with valid scores")
+            st.write(f"Found {len(metro_scores_df)} metros with valid scores")
             
             # Create the heatmap
             fig = px.scatter_mapbox(
