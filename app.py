@@ -31,6 +31,150 @@ category = st.sidebar.selectbox(
     ["Market Overview", "Market Analysis", "Market Activity", "Market Heatmap"]
 )
 
+def plot_market_pressure_gauge(imbalance_data):
+    """Create a gauge chart for market pressure"""
+    if not imbalance_data:
+        return None
+        
+    pressure = imbalance_data['market_pressure']
+    
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = pressure,
+        title = {'text': "Market Pressure<br><sub>(-100 = Buyer's Market, +100 = Seller's Market)</sub>"},
+        gauge = {
+            'axis': {'range': [-100, 100]},
+            'bar': {'color': "darkblue"},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
+            'steps': [
+                {'range': [-100, -50], 'color': 'lightgreen'},
+                {'range': [-50, 0], 'color': 'paleturquoise'},
+                {'range': [0, 50], 'color': 'lightyellow'},
+                {'range': [50, 100], 'color': 'lightcoral'}
+            ],
+        }
+    ))
+    
+    fig.update_layout(height=300)
+    return fig
+
+def plot_investment_score_gauge(pr_data):
+    """Create a gauge chart for investment score"""
+    if not pr_data:
+        return None
+        
+    score = pr_data['investment_score']
+    
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = score,
+        title = {'text': f"Investment Score<br><sub>Current P/R: {pr_data['current_ratio']:.1f}</sub>"},
+        gauge = {
+            'axis': {'range': [0, 100]},
+            'bar': {'color': "darkblue"},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
+            'steps': [
+                {'range': [0, 33], 'color': 'lightcoral'},
+                {'range': [33, 66], 'color': 'lightyellow'},
+                {'range': [66, 100], 'color': 'lightgreen'}
+            ],
+        }
+    ))
+    
+    fig.update_layout(height=300)
+    return fig
+
+def plot_market_cycle_gauge(cycle_data):
+    """Create a gauge chart for market cycle position"""
+    if not cycle_data:
+        return None
+        
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number+delta",
+        value = cycle_data['angle'],
+        title = {'text': f"Market Phase: {cycle_data['phase']}<br><sub>Confidence: {cycle_data['confidence']:.0f}%</sub>"},
+        gauge = {
+            'axis': {'range': [0, 360], 'tickwidth': 1, 'tickcolor': "darkblue"},
+            'bar': {'color': "darkblue"},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
+            'steps': [
+                {'range': [0, 90], 'color': 'lightgreen'},
+                {'range': [90, 180], 'color': 'yellow'},
+                {'range': [180, 270], 'color': 'orange'},
+                {'range': [270, 360], 'color': 'lightblue'}
+            ],
+        }
+    ))
+    
+    fig.update_layout(height=300)
+    return fig
+
+def plot_risk_gauge(volatility_data):
+    """Create a gauge chart for risk score"""
+    if not volatility_data:
+        return None
+        
+    score = volatility_data['risk_score']
+    
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = score,
+        title = {'text': f"Market Stability Score<br><sub>Volatility: {volatility_data['volatility']*100:.1f}%</sub>"},
+        gauge = {
+            'axis': {'range': [0, 100]},
+            'bar': {'color': "darkblue"},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
+            'steps': [
+                {'range': [0, 33], 'color': 'lightcoral'},
+                {'range': [33, 66], 'color': 'lightyellow'},
+                {'range': [66, 100], 'color': 'lightgreen'}
+            ],
+        }
+    ))
+    
+    fig.update_layout(height=300)
+    return fig
+
+def plot_relative_performance(relative_data):
+    """Create a bullet chart for relative performance"""
+    if not relative_data:
+        return None
+        
+    fig = go.Figure(go.Indicator(
+        mode = "number+gauge+delta",
+        value = relative_data['percentile'],
+        delta = {'reference': 50},
+        title = {'text': f"Market Performance Percentile<br><sub>vs State: {relative_data['vs_state']*100:.1f}% | vs National: {relative_data['vs_national']*100:.1f}%</sub>"},
+        gauge = {
+            'shape': "bullet",
+            'axis': {'range': [0, 100]},
+            'threshold': {
+                'line': {'color': "red", 'width': 2},
+                'thickness': 0.75,
+                'value': 50
+            },
+            'steps': [
+                {'range': [0, 20], 'color': "lightcoral"},
+                {'range': [20, 40], 'color': "lightyellow"},
+                {'range': [40, 60], 'color': "lightgreen"},
+                {'range': [60, 80], 'color': "lightyellow"},
+                {'range': [80, 100], 'color': "lightcoral"}
+            ],
+            'bar': {'color': "darkblue"}
+        }
+    ))
+    
+    fig.update_layout(height=200)
+    return fig
+
 if data_loaded:
     if category == "Market Heatmap":
         st.write("# 🗺️ National Market Investment Heatmap")
