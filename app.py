@@ -59,6 +59,95 @@ except Exception as e:
 # Set Mapbox token
 px.set_mapbox_access_token(st.secrets["mapbox"]["token"])
 
+# Common metro coordinates to avoid API calls
+METRO_COORDINATES = {
+    'New York': (40.7128, -74.0060),
+    'Los Angeles': (34.0522, -118.2437),
+    'Chicago': (41.8781, -87.6298),
+    'Houston': (29.7604, -95.3698),
+    'Phoenix': (33.4484, -112.0740),
+    'Philadelphia': (39.9526, -75.1652),
+    'San Antonio': (29.4241, -98.4936),
+    'San Diego': (32.7157, -117.1611),
+    'Dallas': (32.7767, -96.7970),
+    'San Jose': (37.3382, -121.8863),
+    'Austin': (30.2672, -97.7431),
+    'Jacksonville': (30.3322, -81.6557),
+    'Fort Worth': (32.7555, -97.3308),
+    'Columbus': (39.9612, -82.9988),
+    'San Francisco': (37.7749, -122.4194),
+    'Charlotte': (35.2271, -80.8431),
+    'Indianapolis': (39.7684, -86.1581),
+    'Seattle': (47.6062, -122.3321),
+    'Denver': (39.7392, -104.9903),
+    'Washington': (38.9072, -77.0369),
+    'Boston': (42.3601, -71.0589),
+    'Nashville': (36.1627, -86.7816),
+    'Baltimore': (39.2904, -76.6122),
+    'Portland': (45.5155, -122.6789),
+    'Las Vegas': (36.1699, -115.1398),
+    'Milwaukee': (43.0389, -87.9065),
+    'Albuquerque': (35.0844, -106.6504),
+    'Tucson': (32.2226, -110.9747),
+    'Sacramento': (38.5816, -121.4944),
+    'Kansas City': (39.0997, -94.5786),
+    'Miami': (25.7617, -80.1918),
+    'Tampa': (27.9506, -82.4572),
+    'Orlando': (28.5383, -81.3792),
+    'Pittsburgh': (40.4406, -79.9959),
+    'Cincinnati': (39.1031, -84.5120),
+    'Minneapolis': (44.9778, -93.2650),
+    'Cleveland': (41.4993, -81.6944),
+    'Detroit': (42.3314, -83.0458),
+    'Salt Lake City': (40.7608, -111.8910),
+    'St. Louis': (38.6270, -90.1994),
+    'Atlanta': (33.7490, -84.3880),
+    'Raleigh': (35.7796, -78.6382),
+    'Memphis': (35.1495, -90.0490),
+    'Richmond': (37.5407, -77.4360),
+    'Buffalo': (42.8864, -78.8784),
+    'Oklahoma City': (35.4676, -97.5164)
+}
+
+@st.cache_data
+def get_metro_coordinates(metro, state):
+    """Get coordinates for a metro area using hardcoded values or Nominatim"""
+    try:
+        # First check if we have hardcoded coordinates
+        metro_key = metro.split(',')[0].strip()  # Remove any state/county info
+        if metro_key in METRO_COORDINATES:
+            return METRO_COORDINATES[metro_key]
+            
+        # If not found in hardcoded values, try geocoding
+        geolocator = Nominatim(user_agent="zillow_dashboard")
+        
+        # Try different query formats
+        queries = [
+            f"{metro}, {state}, USA",  # Full format
+            f"{metro}, USA",           # Just city and country
+            metro                      # Just city
+        ]
+        
+        for query in queries:
+            try:
+                location = geolocator.geocode(query, timeout=5)  # Increased timeout
+                if location:
+                    return location.latitude, location.longitude
+            except Exception as e:
+                continue
+                
+        # If all queries fail, try one last time with error logging
+        location = geolocator.geocode(f"{metro}, {state}, USA", timeout=10)
+        if location:
+            return location.latitude, location.longitude
+            
+        st.warning(f"Could not find coordinates for {metro}, {state}")
+        return None
+        
+    except Exception as e:
+        st.warning(f"Error getting coordinates for {metro}, {state}: {str(e)}")
+        return None
+
 # Sidebar for navigation
 category = st.sidebar.selectbox(
     "Choose a Dashboard",
@@ -438,19 +527,6 @@ def calculate_all_metro_scores():
     except Exception as e:
         st.error(f"Error calculating metro scores: {str(e)}")
         return pd.DataFrame()
-
-@st.cache_data
-def get_metro_coordinates(metro, state):
-    """Get coordinates for a metro area using Nominatim"""
-    try:
-        geolocator = Nominatim(user_agent="zillow_dashboard")
-        location = geolocator.geocode(f"{metro}, {state}, USA")
-        if location:
-            return location.latitude, location.longitude
-        return None
-    except Exception as e:
-        st.warning(f"Error getting coordinates for {metro}, {state}: {str(e)}")
-        return None
 
 def plot_market_pressure_gauge(imbalance_data):
     """Create a gauge chart for market pressure"""
