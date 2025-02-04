@@ -744,6 +744,29 @@ def plot_relative_performance(relative_data):
     fig.update_layout(height=200)
     return fig
 
+# Initial metro data for faster loading
+INITIAL_METRO_DATA = [
+    {"metro": "New York", "state": "NY", "latitude": 40.7128, "longitude": -74.0060, "investment_score": 75.5, "price_trend": 0.05, "rent_trend": 0.03, "pr_ratio": 25.5},
+    {"metro": "Los Angeles", "state": "CA", "latitude": 34.0522, "longitude": -118.2437, "investment_score": 72.3, "price_trend": 0.04, "rent_trend": 0.02, "pr_ratio": 28.2},
+    {"metro": "Chicago", "state": "IL", "latitude": 41.8781, "longitude": -87.6298, "investment_score": 68.9, "price_trend": 0.03, "rent_trend": 0.02, "pr_ratio": 22.1},
+    {"metro": "Dallas", "state": "TX", "latitude": 32.7767, "longitude": -96.7970, "investment_score": 82.1, "price_trend": 0.06, "rent_trend": 0.04, "pr_ratio": 18.5},
+    {"metro": "Houston", "state": "TX", "latitude": 29.7604, "longitude": -95.3698, "investment_score": 79.8, "price_trend": 0.05, "rent_trend": 0.03, "pr_ratio": 19.2},
+    {"metro": "Washington", "state": "DC", "latitude": 38.9072, "longitude": -77.0369, "investment_score": 71.2, "price_trend": 0.04, "rent_trend": 0.02, "pr_ratio": 24.8},
+    {"metro": "Miami", "state": "FL", "latitude": 25.7617, "longitude": -80.1918, "investment_score": 85.5, "price_trend": 0.07, "rent_trend": 0.05, "pr_ratio": 20.1},
+    {"metro": "Philadelphia", "state": "PA", "latitude": 39.9526, "longitude": -75.1652, "investment_score": 69.8, "price_trend": 0.03, "rent_trend": 0.02, "pr_ratio": 21.5},
+    {"metro": "Atlanta", "state": "GA", "latitude": 33.7490, "longitude": -84.3880, "investment_score": 81.2, "price_trend": 0.06, "rent_trend": 0.04, "pr_ratio": 17.8},
+    {"metro": "Boston", "state": "MA", "latitude": 42.3601, "longitude": -71.0589, "investment_score": 73.4, "price_trend": 0.04, "rent_trend": 0.03, "pr_ratio": 26.2},
+    {"metro": "San Francisco", "state": "CA", "latitude": 37.7749, "longitude": -122.4194, "investment_score": 68.7, "price_trend": 0.03, "rent_trend": 0.02, "pr_ratio": 32.5},
+    {"metro": "Phoenix", "state": "AZ", "latitude": 33.4484, "longitude": -112.0740, "investment_score": 83.9, "price_trend": 0.06, "rent_trend": 0.04, "pr_ratio": 18.9},
+    {"metro": "Riverside", "state": "CA", "latitude": 33.9806, "longitude": -117.3755, "investment_score": 77.8, "price_trend": 0.05, "rent_trend": 0.03, "pr_ratio": 21.3},
+    {"metro": "Detroit", "state": "MI", "latitude": 42.3314, "longitude": -83.0458, "investment_score": 72.5, "price_trend": 0.04, "rent_trend": 0.02, "pr_ratio": 19.8},
+    {"metro": "Seattle", "state": "WA", "latitude": 47.6062, "longitude": -122.3321, "investment_score": 70.2, "price_trend": 0.04, "rent_trend": 0.02, "pr_ratio": 27.4}
+]
+
+# Save initial metro data to CSV if it doesn't exist
+if not os.path.exists('metro_data.csv'):
+    pd.DataFrame(INITIAL_METRO_DATA).to_csv('metro_data.csv', index=False)
+
 # Sidebar for navigation
 category = st.sidebar.selectbox(
     "Choose a Dashboard",
